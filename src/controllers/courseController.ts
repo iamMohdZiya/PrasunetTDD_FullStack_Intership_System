@@ -1,17 +1,76 @@
-// src/controllers/courseController.ts
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/authMiddleware';
 
-// ... (Keep existing createCourse, addChapter, getMyCourses) ...
+// ==========================================
+// MENTOR FUNCTIONS
+// ==========================================
 
-// NEW: Assign Student to Course (Mentor Only)
-export const assignStudentToCourse = async (req: AuthRequest, res: Response) => {
-  const { courseId } = req.params;
-  const { studentEmail } = req.body; // Mentors usually assign by email
+// 1. Create a New Course
+export const createCourse = async (req: AuthRequest, res: Response) => {
+  const { title, description } = req.body;
+  const mentorId = req.user?.userId;
 
   try {
-    // 1. Find Student ID from Email
+    const { data, error } = await supabase
+      .from('courses')
+      .insert([{ title, description, mentor_id: mentorId }])
+      .select();
+
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// 2. Add a Chapter to a Course
+export const addChapter = async (req: AuthRequest, res: Response) => {
+  const { courseId } = req.params;
+  const { title, sequenceOrder, contentUrl } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('chapters')
+      .insert([{ 
+        course_id: courseId, 
+        title, 
+        sequence_order: sequenceOrder, 
+        content_url: contentUrl 
+      }])
+      .select();
+
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// 3. Get All Courses Created by Mentor
+export const getMyCourses = async (req: AuthRequest, res: Response) => {
+  const mentorId = req.user?.userId;
+  
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('mentor_id', mentorId);
+      
+    if (error) throw error;
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 4. Assign a Student to a Course
+export const assignStudentToCourse = async (req: AuthRequest, res: Response) => {
+  const { courseId } = req.params;
+  const { studentEmail } = req.body;
+
+  try {
+    // A. Find Student ID
     const { data: student, error: userError } = await supabase
       .from('users')
       .select('id')
@@ -22,7 +81,7 @@ export const assignStudentToCourse = async (req: AuthRequest, res: Response) => 
       return res.status(404).json({ message: 'Student email not found' });
     }
 
-    // 2. Create Assignment
+    // B. Assign
     const { error: assignError } = await supabase
       .from('assignments')
       .insert([{ course_id: courseId, student_id: student.id }]);
@@ -38,57 +97,70 @@ export const assignStudentToCourse = async (req: AuthRequest, res: Response) => 
   }
 };
 
-// UPDATED: Get Course (Enforce Assignment Check)
-export const getCourseWithChapters = async (req: AuthRequest, res: Response) => {
-  const { courseId } = req.params;
+
+// ==========================================
+// STUDENT FUNCTIONS
+// ==========================================
+
+// 5. Get Courses Assigned to Student
+export const getStudentAssignedCourses = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
 
   try {
-    // 1. SECURITY CHECK: Is the student assigned?
-    const { data: assignment, error: assignError } = await supabase
+    const { data, error } = await supabase
       .from('assignments')
-      .select('id')
-      .eq('course_id', courseId)
-      .eq('student_id', userId)
-      .single();
+      .select('course:courses(*)')
+      .eq('student_id', userId);
 
-    // If no assignment found AND user is a student (Mentors/Admins might bypass this)
-    if (!assignment && req.user?.role === 'student') {
-      return res.status(403).json({ message: 'Access Denied: You are not assigned to this course.' });
-    }
-
-    // 2. Fetch Course & Chapters (Existing logic)
-    const { data: course } = await supabase.from('courses').select('*').eq('id', courseId).single();
-    if (!course) return res.status(404).json({ message: 'Course not found' });
-
-    const { data: chapters } = await supabase
-      .from('chapters')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('sequence_order', { ascending: true });
-
-    res.status(200).json({ course, chapters });
+    if (error) throw error;
+    
+    // Map the nested object to a flat list
+    const courses = data.map((item: any) => item.course);
+    res.json(courses);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// NEW: Get Assigned Courses (For Student Dashboard)
-export const getStudentAssignedCourses = async (req: AuthRequest, res: Response) => {
+// 6. Get Single Course Content (Verified Access)
+export const getCourseWithChapters = async (req: AuthRequest, res: Response) => {
+  const { courseId } = req.params;
   const userId = req.user?.userId;
 
   try {
-    // Join assignments with courses
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('course:courses(*)') // Select the related course data
-      .eq('student_id', userId);
+    // A. Check Assignment (Unless Admin/Mentor)
+    if (req.user?.role === 'student') {
+      const { data: assignment } = await supabase
+        .from('assignments')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('student_id', userId)
+        .single();
 
-    if (error) throw error;
-    
-    // Flatten structure
-    const courses = data.map((item: any) => item.course);
-    res.json(courses);
+      if (!assignment) {
+        return res.status(403).json({ message: 'Access Denied: You are not assigned to this course.' });
+      }
+    }
+
+    // B. Get Course Info
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .single();
+
+    if (courseError || !course) return res.status(404).json({ message: 'Course not found' });
+
+    // C. Get Chapters
+    const { data: chapters, error: chapterError } = await supabase
+      .from('chapters')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('sequence_order', { ascending: true });
+
+    if (chapterError) throw chapterError;
+
+    res.status(200).json({ course, chapters });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
