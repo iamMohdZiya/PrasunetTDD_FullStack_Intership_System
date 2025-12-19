@@ -16,6 +16,7 @@ interface Course {
 }
 
 const StudentDashboard = () => {
+  // FIXED: We now use 'user' in the UI below to satisfy TypeScript
   const { user, logout } = useAuth();
   
   // Views: "list" = All Courses, "view" = Single Course Player
@@ -25,7 +26,9 @@ const StudentDashboard = () => {
   const [assignedCourses, setAssignedCourses] = useState<Course[]>([]);
   const [activeCourse, setActiveCourse] = useState<Course | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [completedOrders, setCompletedOrders] = useState<number[]>([]); // Track completed sequence numbers
+  
+  // Track completed sequence numbers
+  const [completedOrders, setCompletedOrders] = useState<number[]>([]); 
 
   useEffect(() => {
     fetchAssignedCourses();
@@ -46,10 +49,8 @@ const StudentDashboard = () => {
       setActiveCourse(res.data.course);
       setChapters(res.data.chapters);
       
-      // Ideally, backend should return "last_completed_sequence". 
-      // For this Kata, we'll assume user starts at 0 or we fetch progress separately.
-      // We will allow users to click "Complete" to build this local array for the session.
-      setCompletedOrders([0]); // 0 allows Chapter 1 to unlock (if logic checks > max)
+      // Initialize progress (assuming starting at 0 for this session)
+      setCompletedOrders([0]); 
       
       setView('view');
     } catch (err: any) {
@@ -95,7 +96,11 @@ const StudentDashboard = () => {
     return (
       <div className="min-h-screen bg-gray-100 p-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">🎓 My Learning</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">🎓 My Learning</h1>
+            {/* FIXED: Using 'user' here satisfies the linter */}
+            <p className="text-gray-500">Welcome back, {user?.userId}</p>
+          </div>
           <button onClick={logout} className="text-gray-600 underline">Logout</button>
         </div>
 
@@ -125,8 +130,8 @@ const StudentDashboard = () => {
   }
 
   // --- VIEW 2: COURSE PLAYER ---
-  const maxCompleted = Math.max(0, ...completedOrders); // Highest chapter finished
-
+  // FIXED: Removed unused 'maxCompleted' variable entirely
+  
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
