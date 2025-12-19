@@ -2,16 +2,28 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
+interface Course {
+  id: string;
+  title: string;
+}
+
 const MentorDashboard = () => {
   const { user, logout } = useAuth();
-  const [courses, setCourses] = useState<any[]>([]);
+  
+  // Data States
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Form States
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   
-  // Chapter Form State
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [chapterTitle, setChapterTitle] = useState('');
+  const [contentUrl, setContentUrl] = useState('');
   const [sequence, setSequence] = useState(1);
+
+  const [assignEmail, setAssignEmail] = useState('');
 
   useEffect(() => {
     fetchMyCourses();
@@ -19,102 +31,160 @@ const MentorDashboard = () => {
 
   const fetchMyCourses = async () => {
     try {
-      // We need to add this endpoint to the backend logic below
-      const res = await api.get('/courses/my'); 
+      const res = await api.get('/courses/my');
       setCourses(res.data);
     } catch (err) {
-      console.error("Failed to fetch courses");
+      console.error("Failed to load courses");
     }
   };
 
-  const createCourse = async (e: React.FormEvent) => {
+  const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
       await api.post('/courses', { title, description });
+      alert('✅ Course Created!');
       setTitle(''); setDescription('');
-      fetchMyCourses(); // Refresh list
-      alert('Course Created!');
-    } catch (err) {
-      alert('Failed to create course');
+      fetchMyCourses();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to create course');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addChapter = async (e: React.FormEvent) => {
+  const handleAddChapter = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCourseId) return;
+    if (!selectedCourseId) return alert('Select a course first!');
+    setLoading(true);
     try {
       await api.post(`/courses/${selectedCourseId}/chapters`, {
         title: chapterTitle,
         sequenceOrder: sequence,
-        contentUrl: 'https://example.com/demo-video' // Placeholder for PDF req
+        contentUrl: contentUrl || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
       });
-      alert('Chapter Added!');
-      setChapterTitle('');
-      setSequence(sequence + 1);
-    } catch (err) {
-      alert('Failed to add chapter');
+      alert('✅ Chapter Added!');
+      setChapterTitle(''); setContentUrl(''); setSequence(prev => prev + 1);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to add chapter');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourseId) return alert('Select a course first!');
+    setLoading(true);
+    try {
+      await api.post(`/courses/${selectedCourseId}/assign`, {
+        studentEmail: assignEmail
+      });
+      alert('✅ Student Assigned!');
+      setAssignEmail('');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to assign student');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Mentor Dashboard</h1>
-        <div className="space-x-4">
-            <span className="text-gray-600">Mentor: {user?.userId}</span>
-            <button onClick={logout} className="text-red-500">Logout</button>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="flex justify-between items-center mb-8 bg-white p-4 rounded shadow">
+        <h1 className="text-2xl font-bold text-gray-800">👨‍🏫 Mentor Dashboard</h1>
+        <div className="flex gap-4 items-center">
+          <span className="text-sm text-gray-600">ID: {user?.userId.slice(0,8)}...</span>
+          <button onClick={logout} className="text-red-500 font-medium hover:underline">Logout</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Left: Create Course */}
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-bold mb-4">1. Create New Course</h2>
-          <form onSubmit={createCourse} className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* 1. Create Course */}
+        <div className="bg-white p-6 rounded shadow border-l-4 border-blue-500">
+          <h2 className="text-xl font-bold mb-4">1. Create Course</h2>
+          <form onSubmit={handleCreateCourse} className="space-y-4">
             <input 
               placeholder="Course Title" 
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded" 
               value={title} onChange={e => setTitle(e.target.value)} required 
             />
             <textarea 
               placeholder="Description" 
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded h-24" 
               value={description} onChange={e => setDescription(e.target.value)} required 
             />
-            <button className="w-full bg-blue-600 text-white p-2 rounded">Create Course</button>
+            <button disabled={loading} className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
+              {loading ? 'Creating...' : 'Create Course'}
+            </button>
           </form>
         </div>
 
-        {/* Right: Add Chapters */}
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-bold mb-4">2. Add Chapters</h2>
-          <select 
-            className="w-full border p-2 rounded mb-4"
-            onChange={(e) => setSelectedCourseId(e.target.value)}
-            defaultValue=""
-          >
-            <option value="" disabled>Select a Course</option>
-            {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-          </select>
+        {/* 2. Manage Course Content */}
+        <div className="space-y-8">
+          
+          {/* Select Course Dropdown */}
+          <div className="bg-white p-6 rounded shadow">
+            <h2 className="text-xl font-bold mb-4">Select Working Course</h2>
+            <select 
+              className="w-full border p-2 rounded"
+              value={selectedCourseId}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+            >
+              <option value="">-- Choose Course --</option>
+              {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          </div>
 
-          {selectedCourseId && (
-            <form onSubmit={addChapter} className="space-y-4">
+          {/* Add Chapter */}
+          <div className="bg-white p-6 rounded shadow border-l-4 border-green-500">
+            <h2 className="text-xl font-bold mb-4">2. Add Chapter</h2>
+            <form onSubmit={handleAddChapter} className="space-y-4">
               <input 
                 placeholder="Chapter Title" 
-                className="w-full border p-2 rounded"
-                value={chapterTitle} onChange={e => setChapterTitle(e.target.value)} required 
+                className="w-full border p-2 rounded" 
+                value={chapterTitle} onChange={e => setChapterTitle(e.target.value)} 
+                disabled={!selectedCourseId} required 
+              />
+              <input 
+                placeholder="Video URL" 
+                className="w-full border p-2 rounded" 
+                value={contentUrl} onChange={e => setContentUrl(e.target.value)} 
+                disabled={!selectedCourseId} required 
               />
               <div className="flex items-center gap-2">
-                <label>Order:</label>
+                <label>Sequence:</label>
                 <input 
                   type="number" 
-                  className="border p-2 rounded w-20"
-                  value={sequence} onChange={e => setSequence(Number(e.target.value))} required 
+                  className="w-20 border p-2 rounded" 
+                  value={sequence} onChange={e => setSequence(Number(e.target.value))} 
+                  disabled={!selectedCourseId} required 
                 />
               </div>
-              <button className="w-full bg-green-600 text-white p-2 rounded">Add Chapter</button>
+              <button disabled={loading || !selectedCourseId} className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 disabled:bg-gray-300">
+                Add Chapter
+              </button>
             </form>
-          )}
+          </div>
+
+          {/* Assign Student */}
+          <div className="bg-white p-6 rounded shadow border-l-4 border-purple-500">
+            <h2 className="text-xl font-bold mb-4">3. Assign Student</h2>
+            <form onSubmit={handleAssignStudent} className="flex gap-2">
+              <input 
+                type="email" 
+                placeholder="student@example.com" 
+                className="flex-1 border p-2 rounded" 
+                value={assignEmail} onChange={e => setAssignEmail(e.target.value)} 
+                disabled={!selectedCourseId} required 
+              />
+              <button disabled={loading || !selectedCourseId} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:bg-gray-300">
+                Assign
+              </button>
+            </form>
+          </div>
+
         </div>
       </div>
     </div>
