@@ -1,4 +1,5 @@
-import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+import { createContext, useState, useEffect, useContext } from 'react';
+import type { ReactNode } from 'react'; 
 import { jwtDecode } from 'jwt-decode';
 
 interface User {
@@ -21,12 +22,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for token on app load
     const token = localStorage.getItem('token');
     if (token) {
       try {
         const decoded = jwtDecode<User>(token);
-        // Check if token is expired
         if (decoded.exp * 1000 < Date.now()) {
           logout();
         } else {

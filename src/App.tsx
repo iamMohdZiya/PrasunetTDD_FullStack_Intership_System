@@ -1,16 +1,19 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react'; // <--- FIXED: Import ReactNode type
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard'; // Student
-import MentorDashboard from './pages/MentorDashboard'; // Mentor
-import AdminPanel from './pages/AdminPanel'; // Admin
+import Dashboard from './pages/Dashboard';
+import MentorDashboard from './pages/MentorDashboard';
+import AdminPanel from './pages/AdminPanel';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Role Guard Component
-const ProtectedRoute = ({ children, allowedRoles }: { children: JSX.Element, allowedRoles: string[] }) => {
+// FIXED: Changed 'JSX.Element' to 'ReactNode'
+const ProtectedRoute = ({ children, allowedRoles }: { children: ReactNode, allowedRoles: string[] }) => {
   const { user, loading } = useAuth();
+  
   if (loading) return <div>Loading...</div>;
   if (!user || !allowedRoles.includes(user.role)) return <Navigate to="/login" />;
-  return children;
+  
+  return <>{children}</>; // Wrap children in fragment to satisfy type if needed
 };
 
 function App() {
@@ -37,7 +40,7 @@ function App() {
               <AdminPanel />
             </ProtectedRoute>
           } />
-
+          
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </Router>
