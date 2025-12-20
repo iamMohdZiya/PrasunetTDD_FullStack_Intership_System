@@ -29,7 +29,7 @@ export const register = async (req: Request, res: Response) => {
       .insert([
         { 
           email, 
-          password: hashedPassword, 
+          password_hash: hashedPassword, 
           role, 
           full_name: fullName, // <--- Saving the name
           is_approved: role === 'student' ? true : false 
