@@ -25,9 +25,11 @@ export const createCourse = async (req: AuthRequest, res: Response) => {
 };
 
 // 2. Add a Chapter to a Course
+// Update the addChapter function
 export const addChapter = async (req: AuthRequest, res: Response) => {
   const { courseId } = req.params;
-  const { title, sequenceOrder, contentUrl } = req.body;
+  // Added imageUrl below
+  const { title, sequenceOrder, contentUrl, imageUrl } = req.body; 
 
   try {
     const { data, error } = await supabase
@@ -36,7 +38,8 @@ export const addChapter = async (req: AuthRequest, res: Response) => {
         course_id: courseId, 
         title, 
         sequence_order: sequenceOrder, 
-        content_url: contentUrl 
+        content_url: contentUrl,
+        image_url: imageUrl // <--- Map to DB column
       }])
       .select();
 
