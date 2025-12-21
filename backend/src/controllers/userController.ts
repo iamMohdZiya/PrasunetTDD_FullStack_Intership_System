@@ -27,33 +27,57 @@ export const approveMentor = async (req: AuthRequest, res: Response) => {
 
 
 
+// In src/controllers/userController.ts
+
 export const getAdminStats = async (req: AuthRequest, res: Response) => {
   try {
-    // Fetch Courses with nested Mentor and Assignment data
+    console.log("Admin Stats: Fetching...");
+
+    // 1. Simpler Query (Removed strict !alias hints)
     const { data: courses, error } = await supabase
       .from('courses')
       .select(`
         id,
         title,
-        created_at,
-        mentor:users!mentor_id ( id, email ),
+        mentor:users!courses_mentor_id_fkey ( email ), 
         assignments (
-          student:users!student_id ( id, email )
+          student:users ( email )
         )
       `);
 
-    if (error) throw error;
+    // Note: If the above fails, Supabase might just need standard joining:
+    // .select('id, title, users(email), assignments(users(email))')
+    
+    if (error) {
+      console.error("Supabase Error:", error); // <--- LOGS ERROR TO TERMINAL
+      throw error;
+    }
 
-    // Format the data for easier frontend use
+    // 2. Format Data Safely
     const stats = courses.map((c: any) => ({
       courseId: c.id,
       title: c.title,
-      mentorEmail: c.mentor?.email || 'Unknown',
-      studentCount: c.assignments.length,
-      students: c.assignments.map((a: any) => a.student?.email)
+      // Handle cases where mentor might be null
+      mentorEmail: c.mentor?.email || 'Unknown', 
+      studentCount: c.assignments?.length || 0,
+      students: c.assignments?.map((a: any) => a.student?.email).filter(Boolean) || []
     }));
 
     res.json(stats);
+  } catch (err: any) {
+    console.error("Admin Stats Failed:", err.message);
+    res.status(500).json({ message: 'Failed to load stats. Check server logs.' });
+  }
+};
+
+// Add to src/controllers/userController.ts
+
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabase.from('users').delete().eq('id', id);
+    if (error) throw error;
+    res.json({ message: 'User deleted' });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }

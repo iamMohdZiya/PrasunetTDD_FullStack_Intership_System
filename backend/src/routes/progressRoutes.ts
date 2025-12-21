@@ -1,11 +1,16 @@
-// src/routes/progressRoutes.ts
 import { Router } from 'express';
-import { completeChapter } from '../controllers/progressController';
-import { authenticate } from '../middleware/authMiddleware';
+import { completeChapter, getMyProgress, getCourseProgress } from '../controllers/progressController';
+import { authenticate, authorize } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Only logged-in students can save progress
-router.post('/complete', authenticate, completeChapter);
+// Endpoint: /api/progress/complete
+router.post('/complete', authenticate, authorize(['student']), completeChapter);
+
+// Endpoint: /api/progress/my
+router.get('/my', authenticate, authorize(['student']), getMyProgress);
+
+// Endpoint: /api/progress/course/:courseId
+router.get('/course/:courseId', authenticate, authorize(['student']), getCourseProgress);
 
 export default router;

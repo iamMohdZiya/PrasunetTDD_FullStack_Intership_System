@@ -1,24 +1,26 @@
-import { Router } from 'express';
+import express from 'express';
 import { 
-  getCourseWithChapters, 
   createCourse, 
   addChapter, 
-  getMyCourses,
-  assignStudentToCourse,
-  getStudentAssignedCourses 
+  getMyCourses, 
+  assignStudentToCourse, 
+  getStudentAssignedCourses, 
+  getCourseWithChapters
 } from '../controllers/courseController';
 import { authenticate, authorize } from '../middleware/authMiddleware';
 
-const router = Router();
+const router = express.Router();
 
-// Mentor Routes
+// --- STUDENT ROUTES (Must come BEFORE /:courseId to prevent route collision) ---
+router.get('/assigned', authenticate, authorize(['student']), getStudentAssignedCourses);
+
+// --- MENTOR ROUTES (Must come BEFORE /:courseId to prevent route collision) ---
 router.get('/my', authenticate, authorize(['mentor']), getMyCourses);
+
+// --- PUBLIC / SHARED (Generic route at the end) ---
+router.get('/:courseId', authenticate, getCourseWithChapters);
 router.post('/', authenticate, authorize(['mentor']), createCourse);
 router.post('/:courseId/chapters', authenticate, authorize(['mentor']), addChapter);
 router.post('/:courseId/assign', authenticate, authorize(['mentor']), assignStudentToCourse);
-
-// Student Routes
-router.get('/assigned', authenticate, authorize(['student']), getStudentAssignedCourses);
-router.get('/:courseId', authenticate, getCourseWithChapters);
 
 export default router;
