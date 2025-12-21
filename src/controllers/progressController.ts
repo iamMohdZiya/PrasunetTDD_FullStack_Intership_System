@@ -79,3 +79,29 @@ export const getMyProgress = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+export const getCourseProgress = async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const { courseId } = req.params;
+
+  try {
+    // Get all completed chapters for this student in this course
+    const { data: completedChapters, error } = await supabase
+      .from('progress')
+      .select('chapter_id, chapters(sequence_order)')
+      .eq('user_id', userId)
+      .eq('course_id', courseId);
+
+    if (error) throw error;
+
+    // Extract sequence orders
+    const completedSequences = completedChapters
+      .map((item: any) => item.chapters?.sequence_order)
+      .filter((seq: any) => seq !== null && seq !== undefined);
+
+    res.json({ completedSequences });
+  } catch (err: any) {
+    console.error("Course Progress Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
