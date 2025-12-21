@@ -121,25 +121,59 @@ export const assignStudentToCourse = async (req: AuthRequest, res: Response) => 
 // ==========================================
 
 // 5. Get Assigned Courses
+// src/controllers/courseController.ts
+
+// ... [Keep imports and other functions] ...
+
+// 5. Get Courses Assigned to Student (FIXED & LOGGED)
 export const getStudentAssignedCourses = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
+  console.log("🔍 Fetching courses for Student ID:", userId);
 
   try {
     // Query 'assignments' and join 'courses'
-    const { data, error } = await supabase
+    // We explicitly select course info. If the relationship name is tricky, Supabase 
+    // usually handles 'course:courses(*)' if there is a single FK.
+    const { data: assignments, error } = await supabase
       .from('assignments')
-      .select('course:courses(*)')
+      .select(`
+        course_id,
+        course:courses (
+          id,
+          title,
+          description,
+          mentor_id
+        )
+      `)
       .eq('student_id', userId);
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Supabase Join Error:", error);
+      throw error;
+    }
+
+    console.log("✅ Raw Assignments Found:", assignments?.length);
+
+    if (!assignments || assignments.length === 0) {
+      return res.json([]); // Return empty array if no assignments
+    }
     
-    // Flatten structure
-    const courses = data.map((item: any) => item.course);
+    // Filter out any entries where course is null (e.g. course was deleted)
+    // and Flatten the structure so the frontend gets an array of courses
+    const courses = assignments
+      .map((item: any) => item.course)
+      .filter((course: any) => course !== null);
+
+    console.log("📤 Sending Courses to Frontend:", courses.length);
     res.json(courses);
+
   } catch (err: any) {
+    console.error("❌ Server Error in getStudentAssignedCourses:", err.message);
     res.status(500).json({ message: err.message });
   }
 };
+
+// ... [Keep the rest of the file] ...
 
 // 6. Get Single Course + Chapters
 export const getCourseWithChapters = async (req: AuthRequest, res: Response) => {
